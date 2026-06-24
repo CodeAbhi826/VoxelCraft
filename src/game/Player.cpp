@@ -86,6 +86,23 @@ void Player::breakBlock(World& world) {
     }
 }
 
+bool Player::getTargetBlock(World& world, IVec3& outPos) const {
+    Vec3 dir(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
+             sin(glm::radians(pitch)),
+             cos(glm::radians(pitch)) * sin(glm::radians(yaw)));
+    Vec3 eye = position + Vec3(0, 1.6f, 0);
+    for (float i = 0; i < 8.0f; i += 0.1f) {
+        IVec3 bp((int)floor(eye.x + dir.x * i),
+                 (int)floor(eye.y + dir.y * i),
+                 (int)floor(eye.z + dir.z * i));
+        if (world.getBlock(bp.x, bp.y, bp.z) != (uint16_t)Block::ID::air) {
+            outPos = bp;
+            return true;
+        }
+    }
+    return false;
+}
+
 void Player::placeBlock(World& world) {
     Vec3 dir(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
              sin(glm::radians(pitch)),

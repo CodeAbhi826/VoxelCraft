@@ -8,7 +8,6 @@ Game::Game()
 {
     player.position = Vec3(0, 80, 0);
     lastTime = glfwGetTime();
-    glfwSetInputMode(renderer->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 void Game::run() {
@@ -50,10 +49,16 @@ void Game::run() {
             rightPressed = false;
         }
 
+        IVec3 targetBlock;
+        bool hasTarget = player.getTargetBlock(*world, targetBlock);
+
         glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
         glm::mat4 view = player.getViewMatrix();
         renderer->beginFrame(proj * view);
         renderer->renderChunks(view, proj);
+        if (hasTarget)
+            renderer->renderBlockHighlight(targetBlock);
+        renderer->renderCrosshair();
         renderer->endFrame();
         glfwPollEvents();
     }

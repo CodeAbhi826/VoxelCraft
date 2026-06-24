@@ -26,6 +26,10 @@ namespace Block {
         bool liquid = false;
     };
 
+    inline const Properties& getProperties(ID id) {
+        return getProperties()[(size_t)id];
+    }
+
     inline const std::array<Properties, (size_t)ID::COUNT>& getProperties() {
         static std::array<Properties, (size_t)ID::COUNT> props = []{
             std::array<Properties, (size_t)ID::COUNT> p;

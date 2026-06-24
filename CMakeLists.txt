@@ -15,7 +15,7 @@ add_library(glad STATIC src/glad/glad.c)
 target_include_directories(glad PUBLIC src/glad)
 
 # Main executable
-file(GLOB_RECURSE SOURCES src/*.cpp src/glad/*.c)
+file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(blockclone ${SOURCES})
 target_include_directories(blockclone PRIVATE src)
 target_link_libraries(blockclone PRIVATE OpenGL::GL glfw glm::glm enet::enet glad)

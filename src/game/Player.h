@@ -13,6 +13,7 @@ public:
     void processInput(GLFWwindow* win, float dt);
     void breakBlock(World& world);
     void placeBlock(World& world);
+    bool getTargetBlock(World& world, IVec3& outPos) const;
     glm::mat4 getViewMatrix() const {
         Vec3 front(cos(glm::radians(pitch)) * cos(glm::radians(yaw)),
                    sin(glm::radians(pitch)),
