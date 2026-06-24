@@ -1,13 +1,15 @@
 #pragma once
 #include <vector>
-#include <cstdint>
 #include <glm/glm.hpp>
-#include "../world/Chunk.h"
-#include "../world/World.h"
+
+class World;
+struct Chunk;
 
 struct ChunkMesh {
-    std::vector<float> vertices;
-    std::vector<uint32_t> indices;
+    std::vector<float> opaqueVertices;
+    std::vector<uint32_t> opaqueIndices;
+    std::vector<float> transparentVertices;
+    std::vector<uint32_t> transparentIndices;
     bool ready = false;
 };
 

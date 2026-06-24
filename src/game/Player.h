@@ -1,6 +1,7 @@
 #pragma once
 #include "../core/Math.h"
-#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include "../core/Block.h"
 
 class World;
 class Player {
@@ -9,8 +10,20 @@ public:
     Vec3 velocity = Vec3(0);
     float yaw = 0, pitch = 0;
     bool onGround = false, flying = false;
-    double lastMX = 0, lastMY = 0;
-    bool hasLastCursor = false;
+
+    int hotbar[9] = {
+        (int)Block::ID::grass_block,
+        (int)Block::ID::dirt,
+        (int)Block::ID::stone,
+        (int)Block::ID::cobblestone,
+        (int)Block::ID::wood,
+        (int)Block::ID::leaves,
+        (int)Block::ID::sand,
+        (int)Block::ID::glass,
+        (int)Block::ID::bedrock
+    };
+    int selectedSlot = 0;
+
     void update(float dt, World& world);
     void processInput(GLFWwindow* win, float dt);
     void breakBlock(World& world);

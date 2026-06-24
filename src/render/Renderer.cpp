@@ -140,19 +140,24 @@ Renderer::Renderer(int width, int height) {
     initHighlight();
     initFont();
     initTextVAO();
+    initHotbar();
 }
 
 Renderer::~Renderer() {
     for (auto& [k, cgl] : chunkMeshes) {
-        glDeleteVertexArrays(1, &cgl.vao);
-        glDeleteBuffers(1, &cgl.vbo);
-        glDeleteBuffers(1, &cgl.ebo);
+        for (int i = 0; i < 2; ++i) {
+            glDeleteVertexArrays(1, &cgl.vao[i]);
+            glDeleteBuffers(1, &cgl.vbo[i]);
+            glDeleteBuffers(1, &cgl.ebo[i]);
+        }
     }
     glDeleteVertexArrays(1, &m_crosshairVAO);
     glDeleteBuffers(1, &m_crosshairVBO);
     glDeleteVertexArrays(1, &m_highlightVAO);
     glDeleteBuffers(1, &m_highlightVBO);
     glDeleteBuffers(1, &m_highlightEBO);
+    glDeleteVertexArrays(1, &m_hotbarVAO);
+    glDeleteBuffers(1, &m_hotbarVBO);
     glDeleteProgram(m_lineProgram);
     glDeleteTextures(1, &m_whiteTex);
     glDeleteTextures(1, &m_fontTex);
@@ -174,31 +179,40 @@ void Renderer::beginFrame(const glm::mat4& projView) {
 void Renderer::uploadChunkMesh(int cx, int cz, const ChunkMesh& mesh) {
     int64_t key = (int64_t(cx) << 32) | uint32_t(cz);
     auto& cgl = chunkMeshes[key];
-    if (cgl.vao) {
-        glDeleteVertexArrays(1, &cgl.vao);
-        glDeleteBuffers(1, &cgl.vbo);
-        glDeleteBuffers(1, &cgl.ebo);
+
+    for (int i = 0; i < 2; ++i) {
+        if (cgl.vao[i]) {
+            glDeleteVertexArrays(1, &cgl.vao[i]);
+            glDeleteBuffers(1, &cgl.vbo[i]);
+            glDeleteBuffers(1, &cgl.ebo[i]);
+        }
+        const auto& verts = (i == 0) ? mesh.opaqueVertices : mesh.transparentVertices;
+        const auto& idxs = (i == 0) ? mesh.opaqueIndices : mesh.transparentIndices;
+        if (verts.empty()) continue;
+
+        glCreateVertexArrays(1, &cgl.vao[i]);
+        glCreateBuffers(1, &cgl.vbo[i]);
+        glCreateBuffers(1, &cgl.ebo[i]);
+        glNamedBufferData(cgl.vbo[i], verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+        glNamedBufferData(cgl.ebo[i], idxs.size() * sizeof(uint32_t), idxs.data(), GL_STATIC_DRAW);
+
+        glEnableVertexArrayAttrib(cgl.vao[i], 0);
+        glVertexArrayAttribFormat(cgl.vao[i], 0, 3, GL_FLOAT, GL_FALSE, 0);
+        glVertexArrayAttribBinding(cgl.vao[i], 0, 0);
+        glEnableVertexArrayAttrib(cgl.vao[i], 1);
+        glVertexArrayAttribFormat(cgl.vao[i], 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
+        glVertexArrayAttribBinding(cgl.vao[i], 1, 0);
+        glEnableVertexArrayAttrib(cgl.vao[i], 2);
+        glVertexArrayAttribFormat(cgl.vao[i], 2, 1, GL_FLOAT, GL_FALSE, 5 * sizeof(float));
+        glVertexArrayAttribBinding(cgl.vao[i], 2, 0);
+        glEnableVertexArrayAttrib(cgl.vao[i], 3);
+        glVertexArrayAttribFormat(cgl.vao[i], 3, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float));
+        glVertexArrayAttribBinding(cgl.vao[i], 3, 0);
+
+        glVertexArrayVertexBuffer(cgl.vao[i], 0, cgl.vbo[i], 0, 8 * sizeof(float));
+        glVertexArrayElementBuffer(cgl.vao[i], cgl.ebo[i]);
+        cgl.indexCount[i] = (int)idxs.size();
     }
-    glCreateVertexArrays(1, &cgl.vao);
-    glCreateBuffers(1, &cgl.vbo);
-    glCreateBuffers(1, &cgl.ebo);
-    glNamedBufferData(cgl.vbo, mesh.vertices.size() * sizeof(float), mesh.vertices.data(), GL_STATIC_DRAW);
-    glNamedBufferData(cgl.ebo, mesh.indices.size() * sizeof(uint32_t), mesh.indices.data(), GL_STATIC_DRAW);
-    glEnableVertexArrayAttrib(cgl.vao, 0);
-    glVertexArrayAttribFormat(cgl.vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
-    glVertexArrayAttribBinding(cgl.vao, 0, 0);
-    glEnableVertexArrayAttrib(cgl.vao, 1);
-    glVertexArrayAttribFormat(cgl.vao, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
-    glVertexArrayAttribBinding(cgl.vao, 1, 0);
-    glEnableVertexArrayAttrib(cgl.vao, 2);
-    glVertexArrayAttribFormat(cgl.vao, 2, 1, GL_FLOAT, GL_FALSE, 5 * sizeof(float));
-    glVertexArrayAttribBinding(cgl.vao, 2, 0);
-    glEnableVertexArrayAttrib(cgl.vao, 3);
-    glVertexArrayAttribFormat(cgl.vao, 3, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float));
-    glVertexArrayAttribBinding(cgl.vao, 3, 0);
-    glVertexArrayVertexBuffer(cgl.vao, 0, cgl.vbo, 0, 8 * sizeof(float));
-    glVertexArrayElementBuffer(cgl.vao, cgl.ebo);
-    cgl.indexCount = (int)mesh.indices.size();
 }
 
 void Renderer::renderChunks(const glm::mat4& view, const glm::mat4& proj) {
@@ -206,14 +220,28 @@ void Renderer::renderChunks(const glm::mat4& view, const glm::mat4& proj) {
     m_textureAtlas.bind(0);
     glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
     const float maxD = 16.0f * 14.0f;
+
+    glDisable(GL_BLEND);
     for (auto& [key, cgl] : chunkMeshes) {
         int cx = (int)(key >> 32), cz = (int)(key & 0xFFFFFFFF);
         float dx = (cx*16+8) - camPos.x, dz = (cz*16+8) - camPos.z;
         if (dx*dx + dz*dz > maxD*maxD) continue;
-        glBindVertexArray(cgl.vao);
-        glDrawElements(GL_TRIANGLES, cgl.indexCount, GL_UNSIGNED_INT, nullptr);
+        if (cgl.indexCount[0] == 0) continue;
+        glBindVertexArray(cgl.vao[0]);
+        glDrawElements(GL_TRIANGLES, cgl.indexCount[0], GL_UNSIGNED_INT, nullptr);
+    }
+
+    glEnable(GL_BLEND);
+    for (auto& [key, cgl] : chunkMeshes) {
+        int cx = (int)(key >> 32), cz = (int)(key & 0xFFFFFFFF);
+        float dx = (cx*16+8) - camPos.x, dz = (cz*16+8) - camPos.z;
+        if (dx*dx + dz*dz > maxD*maxD) continue;
+        if (cgl.indexCount[1] == 0) continue;
+        glBindVertexArray(cgl.vao[1]);
+        glDrawElements(GL_TRIANGLES, cgl.indexCount[1], GL_UNSIGNED_INT, nullptr);
     }
     glBindVertexArray(0);
+    glDisable(GL_BLEND);
 }
 
 void Renderer::initCrosshair() {
@@ -316,6 +344,64 @@ int Renderer::glyphIndex(char c) const {
     if (c==':') return 13;
     if (c==' ') return 14;
     return -1;
+}
+
+void Renderer::initHotbar() {
+    float boxW = 0.08f;
+    float boxH = 0.12f;
+    float gap = 0.01f;
+    float startX = -((9 * boxW + 8 * gap) / 2.0f);
+    float y = -0.95f;
+
+    std::vector<float> verts;
+    for (int i = 0; i < 9; ++i) {
+        float x = startX + i * (boxW + gap);
+        float u = 0.0f, v = 0.0f;
+        verts.insert(verts.end(), {
+            x, y, 0.0f, u, v,
+            x + boxW, y, 0.0f, u, v,
+            x + boxW, y + boxH, 0.0f, u, v,
+
+            x, y, 0.0f, u, v,
+            x + boxW, y + boxH, 0.0f, u, v,
+            x, y + boxH, 0.0f, u, v
+        });
+    }
+
+    glCreateVertexArrays(1, &m_hotbarVAO);
+    glCreateBuffers(1, &m_hotbarVBO);
+    glNamedBufferData(m_hotbarVBO, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+
+    glEnableVertexArrayAttrib(m_hotbarVAO, 0);
+    glVertexArrayAttribFormat(m_hotbarVAO, 0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float));
+    glVertexArrayAttribBinding(m_hotbarVAO, 0, 0);
+
+    glEnableVertexArrayAttrib(m_hotbarVAO, 1);
+    glVertexArrayAttribFormat(m_hotbarVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
+    glVertexArrayAttribBinding(m_hotbarVAO, 1, 0);
+
+    glVertexArrayVertexBuffer(m_hotbarVAO, 0, m_hotbarVBO, 0, 5 * sizeof(float));
+}
+
+void Renderer::renderHotbar(int selectedSlot) {
+    glUseProgram(m_uiProgram);
+    glBindTextureUnit(0, m_whiteTex);
+    glDisable(GL_DEPTH_TEST);
+
+    glBindVertexArray(m_hotbarVAO);
+
+    for (int i = 0; i < 9; ++i) {
+        if (i == selectedSlot) {
+            glUniform4f(glGetUniformLocation(m_uiProgram, "uColor"), 1.0f, 1.0f, 1.0f, 0.8f);
+        } else {
+            glUniform4f(glGetUniformLocation(m_uiProgram, "uColor"), 0.2f, 0.2f, 0.2f, 0.6f);
+        }
+        glDrawArrays(GL_TRIANGLES, i * 6, 6);
+    }
+
+    glBindVertexArray(0);
+    glEnable(GL_DEPTH_TEST);
+    glUseProgram(0);
 }
 
 void Renderer::renderCrosshair() {

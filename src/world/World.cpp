@@ -1,4 +1,5 @@
 #include "World.h"
+#include <algorithm>
 #include <iostream>
 #include <mutex>
 #include <shared_mutex>
@@ -6,7 +7,8 @@
 
 World::World(uint64_t seed) : generator(seed),
     genPool(std::max(1u, std::thread::hardware_concurrency() > 1
-        ? std::thread::hardware_concurrency() - 1 : 1u)) {}
+        ? std::thread::hardware_concurrency() - 1 : 1u)),
+    meshPool(std::max(1u, std::thread::hardware_concurrency() / 2)) {}
 
 World::~World() = default;
 
@@ -39,7 +41,6 @@ void World::setBlock(int x, int y, int z, BlockStateID s) {
         c->setBlock(bx, y, bz, s);
         c->sections[(y+64)/16].dirty = true;
         markChunkDirty(cx, cz);
-        // If on chunk boundary, also mark neighbor chunks
         if (bx == 0) markChunkDirty(cx - 1, cz);
         if (bx == 15) markChunkDirty(cx + 1, cz);
         if (bz == 0) markChunkDirty(cx, cz - 1);
@@ -68,8 +69,16 @@ void World::loadChunkAsync(int cx, int cz) {
     }
     genPool.enqueue([this, raw] {
         generator.generate(*raw);
-        lightChunk(raw.get());
-        meshChunk(raw.get());
+        raw->state = Chunk::Ready;
+
+        meshPool.enqueue([this, raw] {
+            ChunkMesh mesh = MeshBuilder::build(*raw, *this);
+            {
+                std::lock_guard lk(uploadMutex);
+                pendingUploads.push_back({raw->x, raw->z, std::move(mesh)});
+            }
+            raw->state = Chunk::Empty;
+        });
     });
 }
 
@@ -93,27 +102,9 @@ void World::updatePlayerPosition(int px, int pz, int dist) {
             loadChunkAsync(centerX + dx, centerZ + dz);
 }
 
-void World::lightChunk(Chunk* chunk) {
-    for (int x = 0; x < 16; ++x) {
-        for (int z = 0; z < 16; ++z) {
-            int h = chunk->heightmap[x + z * 16];
-            for (int y = h + 1; y < 320; ++y) {
-                int sec = (y + 64) / 16;
-                int ly = (y + 64) % 16;
-                chunk->sections[sec].setSkyLight(x, ly, z, 15);
-            }
-        }
-    }
-    chunk->state = Chunk::Lit;
-}
-
-void World::meshChunk(Chunk* chunk) {
-    chunk->state = Chunk::Ready;
-}
-
-std::vector<Chunk*> World::getReadyChunks() {
-    std::shared_lock lock(chunkMutex);
-    std::vector<Chunk*> ready;
-    for (auto& [k, c] : chunks) if (c->state == Chunk::Ready) ready.push_back(c.get());
-    return ready;
+std::vector<World::PendingUpload> World::drainUploads() {
+    std::lock_guard lk(uploadMutex);
+    std::vector<PendingUpload> out;
+    out.swap(pendingUploads);
+    return out;
 }

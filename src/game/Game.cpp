@@ -4,13 +4,20 @@
 #include <string>
 #include <cmath>
 
+double Game::scrollOffset = 0.0;
+
+void Game::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    scrollOffset += yoffset;
+}
+
 Game::Game()
-    : renderer(std::make_unique<Renderer>(1280, 720)),
-      world(std::make_unique<World>(12345ull))
+: renderer(std::make_unique<Renderer>(1280, 720)),
+  world(std::make_unique<World>(12345ull))
 {
     player.position = Vec3(0, 100, 0);
     lastTime = glfwGetTime();
     world->updatePlayerPosition(0, 0, 10);
+    glfwSetScrollCallback(renderer->window, scrollCallback);
 }
 
 void Game::run() {
@@ -26,6 +33,17 @@ void Game::run() {
 
         player.processInput(renderer->window, dt);
 
+        if (scrollOffset != 0.0) {
+            int dir = scrollOffset > 0 ? -1 : 1;
+            player.selectedSlot = (player.selectedSlot + dir + 9) % 9;
+            scrollOffset = 0.0;
+        }
+        for (int i = 0; i < 9; ++i) {
+            if (glfwGetKey(renderer->window, GLFW_KEY_1 + i) == GLFW_PRESS) {
+                player.selectedSlot = i;
+            }
+        }
+
         static float accumulator = 0;
         accumulator += dt;
         while (accumulator >= 0.05f) {
@@ -34,38 +52,28 @@ void Game::run() {
             accumulator -= 0.05f;
         }
 
-        for (auto* ch : world->getReadyChunks()) {
-            if (ch->state == Chunk::Ready) {
-                ChunkMesh mesh = MeshBuilder::build(*ch, *world);
-                renderer->uploadChunkMesh(ch->x, ch->z, mesh);
-                ch->state = Chunk::Empty;
-            }
+        for (auto& up : world->drainUploads()) {
+            renderer->uploadChunkMesh(up.cx, up.cz, up.mesh);
         }
 
         static bool leftPressed = false, rightPressed = false;
         if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !leftPressed) {
-            player.breakBlock(*world);
-            leftPressed = true;
-        } else if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
-            leftPressed = false;
-        }
+            player.breakBlock(*world); leftPressed = true;
+        } else if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) leftPressed = false;
         if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS && !rightPressed) {
-            player.placeBlock(*world);
-            rightPressed = true;
-        } else if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) {
-            rightPressed = false;
-        }
+            player.placeBlock(*world); rightPressed = true;
+        } else if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) rightPressed = false;
 
         IVec3 targetBlock;
         bool hasTarget = player.getTargetBlock(*world, targetBlock);
-
         glm::mat4 proj = glm::perspective(glm::radians(70.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
         glm::mat4 view = player.getViewMatrix();
+
         renderer->beginFrame(proj * view);
         renderer->renderChunks(view, proj);
-        if (hasTarget)
-            renderer->renderBlockHighlight(targetBlock);
+        if (hasTarget) renderer->renderBlockHighlight(targetBlock);
         renderer->renderCrosshair();
+        renderer->renderHotbar(player.selectedSlot);
 
         ++fpsFrames;
         if (now - fpsLast >= 0.25) {

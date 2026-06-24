@@ -14,4 +14,7 @@ private:
     Player player;
     double lastTime;
     void processInput();
+
+    static double scrollOffset;
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 };

@@ -168,16 +168,15 @@ void Player::placeBlock(World& world) {
              sin(glm::radians(pitch)),
              cos(glm::radians(pitch)) * sin(glm::radians(yaw)));
     Vec3 eye = position + Vec3(0, 1.6f, 0);
+    IVec3 lastBp((int)floor(eye.x), (int)floor(eye.y), (int)floor(eye.z));
     for (float i = 0; i < 8.0f; i += 0.1f) {
         IVec3 bp((int)floor(eye.x + dir.x * i),
                  (int)floor(eye.y + dir.y * i),
                  (int)floor(eye.z + dir.z * i));
         if (world.getBlock(bp.x, bp.y, bp.z) != (uint16_t)Block::ID::air) {
-            IVec3 prev((int)floor(eye.x + dir.x * (i - 0.2f)),
-                       (int)floor(eye.y + dir.y * (i - 0.2f)),
-                       (int)floor(eye.z + dir.z * (i - 0.2f)));
-            world.setBlock(prev.x, prev.y, prev.z, (uint16_t)Block::ID::cobblestone);
+            world.setBlock(lastBp.x, lastBp.y, lastBp.z, hotbar[selectedSlot]);
             return;
         }
+        lastBp = bp;
     }
 }
