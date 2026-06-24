@@ -21,21 +21,3 @@ jobs:
           name: VoxelCraft-Linux
           path: build/voxelcraft
 
-  build-windows:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
-          .\vcpkg\vcpkg install glfw3 glm enet --triplet x64-windows
-      - name: Configure
-        run: cmake -B build "-DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: VoxelCraft-Windows
-          path: build/Release/voxelcraft.exe
