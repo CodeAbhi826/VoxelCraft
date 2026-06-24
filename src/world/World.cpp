@@ -31,6 +31,7 @@ BlockStateID World::getBlock(int x, int y, int z) const {
 }
 
 void World::setBlock(int x, int y, int z, BlockStateID s) {
+    if (y < -64 || y >= 320) return;
     int cx = x >> 4, cz = z >> 4;
     int bx = x & 15, bz = z & 15;
     Chunk* c = getChunk(cx, cz);

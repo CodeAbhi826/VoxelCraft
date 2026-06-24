@@ -1,19 +1,23 @@
 #include "Game.h"
 #include "../render/MeshBuilder.h"
 #include <GLFW/glfw3.h>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/constants.hpp>
+#include <string>
+#include <cmath>
 
 Game::Game()
     : renderer(std::make_unique<Renderer>(1280, 720)),
       world(std::make_unique<World>(12345ull))
 {
-    player.position = Vec3(0, 70, 0);
+    player.position = Vec3(0, 100, 0);
     lastTime = glfwGetTime();
     world->updatePlayerPosition(0, 0, 10);
 }
 
 void Game::run() {
+    int fpsFrames = 0;
+    double fpsLast = lastTime;
+    std::string fpsStr = "FPS: 0";
+
     while (!glfwWindowShouldClose(renderer->window)) {
         double now = glfwGetTime();
         float dt = float(now - lastTime);
@@ -62,6 +66,15 @@ void Game::run() {
         if (hasTarget)
             renderer->renderBlockHighlight(targetBlock);
         renderer->renderCrosshair();
+
+        ++fpsFrames;
+        if (now - fpsLast >= 0.25) {
+            fpsStr = "FPS: " + std::to_string((int)std::round(fpsFrames / (now - fpsLast)));
+            fpsFrames = 0;
+            fpsLast = now;
+        }
+        renderer->renderText(fpsStr, -0.98f, 0.92f, 0.06f);
+
         renderer->endFrame();
         glfwPollEvents();
     }

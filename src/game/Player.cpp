@@ -13,7 +13,9 @@ void Player::update(float dt, World& world) {
     Vec3 delta = velocity * dt;
 
     auto collides = [&](int bx, int by, int bz) {
-        return world.getBlock(bx, by, bz) != (uint16_t)Block::ID::air;
+        uint16_t id = world.getBlock(bx, by, bz);
+        if (id == (uint16_t)Block::ID::air) return false;
+        return Block::getProperties((Block::ID)id).solid;
     };
 
     // X axis
