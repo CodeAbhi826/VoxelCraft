@@ -1,13 +1,13 @@
-# Minecraft Clone - Optimised Voxel Engine
+# VoxelCraft - Optimised Voxel Engine
 
-Full Minecraft replica with infinite terrain, greedy meshing, palette storage, multithreading, and networking support.
+High-performance voxel game with infinite terrain, greedy meshing, palette storage, multithreading, and networking support.
 
 ## Build Locally
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
-./blockclone
+./voxelcraft
 ```
 
 ## Cloud Compilation (GitHub Actions)

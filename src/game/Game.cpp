@@ -6,8 +6,9 @@ Game::Game()
     : renderer(std::make_unique<Renderer>(1280, 720)),
       world(std::make_unique<World>(12345ull))
 {
-    player.position = Vec3(0, 80, 0);
+    player.position = Vec3(0, 70, 0);
     lastTime = glfwGetTime();
+    world->updatePlayerPosition(0, 0, 10);
 }
 
 void Game::run() {

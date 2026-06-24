@@ -18,8 +18,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MinecraftClone-Linux
-          path: build/blockclone
+          name: VoxelCraft-Linux
+          path: build/voxelcraft
 
   build-windows:
     runs-on: windows-2022
@@ -37,5 +37,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MinecraftClone-Windows
-          path: build/Release/blockclone.exe
+          name: VoxelCraft-Windows
+          path: build/Release/voxelcraft.exe

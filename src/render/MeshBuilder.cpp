@@ -31,7 +31,6 @@ bool MeshBuilder::isVisible(const World& world, int wx, int wy, int wz, int dir)
 
 ChunkMesh MeshBuilder::build(const Chunk& chunk, const World& world) {
     ChunkMesh mesh;
-    const ivec3 origin(chunk.x * 16, -64, chunk.z * 16);
 
     for (int y = -64; y < 320; ++y) {
         for (int x = 0; x < 16; ++x) {
@@ -39,9 +38,9 @@ ChunkMesh MeshBuilder::build(const Chunk& chunk, const World& world) {
                 BlockStateID block = chunk.getBlock(x, y, z);
                 if (block == (uint16_t)Block::ID::air) continue;
 
-                int wx = origin.x + x;
-                int wy = origin.y + y;
-                int wz = origin.z + z;
+                int wx = chunk.x * 16 + x;
+                int wy = y;
+                int wz = chunk.z * 16 + z;
 
                 for (int d = 0; d < 6; ++d) {
                     if (isVisible(world, wx, wy, wz, d)) {

@@ -94,7 +94,7 @@ Renderer::Renderer(int width, int height) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    window = glfwCreateWindow(width, height, "Minecraft Clone", nullptr, nullptr);
+    window = glfwCreateWindow(width, height, "VoxelCraft", nullptr, nullptr);
     glfwMakeContextCurrent(window);
     gladLoadGL((GLADloadfunc)glfwGetProcAddress);
     glEnable(GL_DEPTH_TEST);
