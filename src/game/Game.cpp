@@ -159,7 +159,7 @@ void Game::run() {
             renderer->endFrame();
             glfwPollEvents();
 
-            if (progress >= 1.0f || (glfwGetTime() - loadStart > 8.0)) {
+            if (progress >= 1.0f || (glfwGetTime() - loadStart > 30.0)) {
                 log("INFO", "engine", "Loading complete (" + std::to_string(readyChunks) + "/" + std::to_string(totalChunks) + " chunks)");
                 state = GameState::StartScreen;
                 loadStep = 0;
@@ -171,10 +171,13 @@ void Game::run() {
             if (glfwGetKey(renderer->window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(renderer->window, true);
             }
-            if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !leftPressed) {
+                leftPressed = true;
                 state = GameState::Playing;
                 glfwSetInputMode(renderer->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                 log("DEBUG", "engine", "Pointer lock acquired");
+            } else if (glfwGetMouseButton(renderer->window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+                leftPressed = false;
             }
             if (glfwGetKey(renderer->window, GLFW_KEY_O) == GLFW_PRESS) {
                 state = GameState::Settings;
@@ -186,7 +189,7 @@ void Game::run() {
                 showHelp = !showHelp;
             }
 
-            Vec3 startCamPos(0, 180, 80);
+            Vec3 startCamPos(0, 90, 30);
             float startCamYaw = 180.0f;
             float startCamPitch = -25.0f;
             glm::mat4 startView = glm::lookAt(
@@ -200,8 +203,20 @@ void Game::run() {
             renderer->renderChunks(startView, proj);
             renderer->endFrame();
 
+            // Also upload chunk meshes so terrain appears behind the menu
+            if (pendingUploads.empty())
+                pendingUploads = world->drainUploads();
+            if (!pendingUploads.empty()) {
+                int budget = std::min(4, (int)pendingUploads.size());
+                for (int i = 0; i < budget; ++i)
+                    renderer->uploadChunkMesh(pendingUploads[i].cx, pendingUploads[i].cz, pendingUploads[i].mesh);
+                pendingUploads.erase(pendingUploads.begin(), pendingUploads.begin() + budget);
+            }
+
             renderStartScreen();
             glfwPollEvents();
+            // Yield CPU to let background gen/mesh threads finish
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
 
