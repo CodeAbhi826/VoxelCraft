@@ -9,8 +9,9 @@ struct Chunk {
     static constexpr int kSections = 24;
     ChunkSection sections[kSections];
     std::array<int16_t, 256> heightmap;
-    enum State { Empty, Generating, Lit, Meshing, Ready, Unloading };
+    enum State { Empty, Generating, Lit, Meshing, Ready, Dirty, Unloading };
     std::atomic<State> state = Empty;
+    int minY = 320, maxY = -64;
 
     Chunk(int cx, int cz) : x(cx), z(cz) {}
     BlockStateID getBlock(int bx, int by, int bz) const {
@@ -24,5 +25,9 @@ struct Chunk {
         int sec = (by + 64) / 16;
         int ly = (by + 64) % 16;
         sections[sec].setBlock(bx, ly, bz, s);
+        if (s != (uint16_t)Block::ID::air) {
+            if (by < minY) minY = by;
+            if (by > maxY) maxY = by;
+        }
     }
 };

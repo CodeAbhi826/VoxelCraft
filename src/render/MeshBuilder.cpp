@@ -3,6 +3,7 @@
 #include "../world/Chunk.h"
 #include "../world/World.h"
 #include <glm/glm.hpp>
+#include <algorithm>
 
 using namespace glm;
 namespace {
@@ -29,7 +30,10 @@ bool MeshBuilder::isVisible(const World& world, int wx, int wy, int wz, int dir)
 
 ChunkMesh MeshBuilder::build(const Chunk& chunk, const World& world) {
     ChunkMesh mesh;
-    for (int y = -64; y < 320; ++y) {
+    if (chunk.maxY < chunk.minY) { mesh.ready = true; return mesh; }
+    int yStart = std::max(-64, chunk.minY - 1);
+    int yEnd   = std::min(320, chunk.maxY + 2);
+    for (int y = yStart; y < yEnd; ++y) {
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 BlockStateID block = chunk.getBlock(x, y, z);

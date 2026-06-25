@@ -55,27 +55,36 @@ inline void ChunkSection::ensureGuardWord() {
 }
 
 inline void ChunkSection::resizePalette(int newBits) {
+    if (newBits == bitsPerBlock) return;
     int oldBits = bitsPerBlock;
+
+    size_t oldNeeded = (kVolume * oldBits + 63) / 64 + 1;
+    if (data.size() < oldNeeded) data.resize(oldNeeded, 0);
+
     bitsPerBlock = newBits;
-    ensureGuardWord();
     std::vector<uint64_t> newData((kVolume * bitsPerBlock + 63) / 64 + 1, 0);
+
+    uint64_t oldMask = (1ULL << oldBits) - 1;
+    uint64_t newMask = (1ULL << bitsPerBlock) - 1;
+
     for (int i = 0; i < kVolume; ++i) {
-        int oldIndex = (i * oldBits);
-        int oldWord = oldIndex >> 6;
-        int oldOff = oldIndex & 63;
-        uint64_t oldMask = (1ULL << oldBits) - 1;
-        int value = (data[oldWord] >> oldOff) & oldMask;
+        int oldBitIndex = i * oldBits;
+        int oldWord = oldBitIndex >> 6;
+        int oldOff = oldBitIndex & 63;
+
+        int value = (int)((data[oldWord] >> oldOff) & oldMask);
         if (oldOff + oldBits > 64) {
             int bitsNext = oldOff + oldBits - 64;
-            value |= (data[oldWord + 1] & ((1ULL << bitsNext) - 1)) << (64 - oldOff);
+            value |= (int)((data[oldWord + 1] & ((1ULL << bitsNext) - 1)) << (64 - oldOff));
         }
-        int newIndex = i * bitsPerBlock;
-        int newWord = newIndex >> 6;
-        int newOff = newIndex & 63;
-        newData[newWord] |= (uint64_t)value << newOff;
+
+        int newBitIndex = i * bitsPerBlock;
+        int newWord = newBitIndex >> 6;
+        int newOff = newBitIndex & 63;
+        newData[newWord] |= ((uint64_t)value & newMask) << newOff;
         if (newOff + bitsPerBlock > 64) {
             int bitsNext = newOff + bitsPerBlock - 64;
-            newData[newWord + 1] |= (value >> (64 - newOff)) & ((1ULL << bitsNext) - 1);
+            newData[newWord + 1] |= ((uint64_t)value >> (64 - newOff)) & ((1ULL << bitsNext) - 1);
         }
     }
     data = std::move(newData);

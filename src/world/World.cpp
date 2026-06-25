@@ -52,9 +52,25 @@ void World::setBlock(int x, int y, int z, BlockStateID s) {
 void World::markChunkDirty(int cx, int cz) {
     Chunk* c = getChunk(cx, cz);
     if (c) {
-        Chunk::State s = c->state.load();
-        if (s == Chunk::Empty || s == Chunk::Ready)
-            c->state = Chunk::Ready;
+        Chunk::State expected = Chunk::Ready;
+        if (c->state.compare_exchange_strong(expected, Chunk::Dirty)) {
+            std::shared_ptr<Chunk> sp;
+            {
+                std::shared_lock lock(chunkMutex);
+                auto it = chunks.find(chunkKey(cx, cz));
+                if (it != chunks.end()) sp = it->second;
+            }
+            if (sp) {
+                meshPool.enqueue([this, sp] {
+                    ChunkMesh mesh = MeshBuilder::build(*sp, *this);
+                    {
+                        std::lock_guard lk(uploadMutex);
+                        pendingUploads.push_back({sp->x, sp->z, std::move(mesh)});
+                    }
+                    sp->state = Chunk::Ready;
+                });
+            }
+        }
     }
 }
 
@@ -70,7 +86,7 @@ void World::loadChunkAsync(int cx, int cz) {
     }
     genPool.enqueue([this, raw] {
         generator.generate(*raw);
-        raw->state = Chunk::Ready;
+        raw->state = Chunk::Lit;
 
         meshPool.enqueue([this, raw] {
             ChunkMesh mesh = MeshBuilder::build(*raw, *this);
@@ -78,7 +94,7 @@ void World::loadChunkAsync(int cx, int cz) {
                 std::lock_guard lk(uploadMutex);
                 pendingUploads.push_back({raw->x, raw->z, std::move(mesh)});
             }
-            raw->state = Chunk::Empty;
+            raw->state = Chunk::Ready;
         });
     });
 }
@@ -91,7 +107,9 @@ void World::updatePlayerPosition(int px, int pz, int dist) {
     {
         std::unique_lock lock(chunkMutex);
         for (auto& [k, c] : chunks) {
-            if (std::abs(c->x - centerX) > radius + 2 || std::abs(c->z - centerZ) > radius + 2) {
+            Chunk::State s = c->state.load();
+            bool far = std::abs(c->x - centerX) > radius + 1 || std::abs(c->z - centerZ) > radius + 1;
+            if (far && (s == Chunk::Ready || s == Chunk::Empty)) {
                 c->state = Chunk::Unloading;
                 remove.push_back(k);
             }

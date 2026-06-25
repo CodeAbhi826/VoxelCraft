@@ -24,4 +24,5 @@ private:
 
     static double scrollOffset;
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+    static void cursorCallback(GLFWwindow* window, double xpos, double ypos);
 };

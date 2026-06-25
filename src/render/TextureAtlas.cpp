@@ -53,13 +53,19 @@ void TextureAtlas::generateProcedural() {
         }
     }
 
+    int mipLevels = 1;
+    while ((m_textureSize >> mipLevels) > 1) ++mipLevels;
+
     glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &m_textureId);
-    glTextureStorage3D(m_textureId, 1, GL_RGBA8, m_textureSize, m_textureSize, m_layerCount);
+    glTextureStorage3D(m_textureId, mipLevels, GL_RGBA8, m_textureSize, m_textureSize, m_layerCount);
     glTextureSubImage3D(m_textureId, 0, 0, 0, 0,
                         m_textureSize, m_textureSize, m_layerCount,
                         GL_RGBA, GL_UNSIGNED_BYTE, data.data());
-    glTextureParameteri(m_textureId, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glGenerateTextureMipmap(m_textureId);
+    glTextureParameteri(m_textureId, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTextureParameteri(m_textureId, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(m_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(m_textureId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     m_loaded = true;
 }
 

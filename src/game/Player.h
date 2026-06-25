@@ -28,6 +28,22 @@ public:
     };
     int selectedSlot = 0;
 
+    void onMouseMove(double xpos, double ypos) {
+        if (!hasLastCursor) {
+            lastMX = xpos;
+            lastMY = ypos;
+            hasLastCursor = true;
+            return;
+        }
+        float dx = float(xpos - lastMX) * 0.1f;
+        float dy = float(lastMY - ypos) * 0.1f;
+        lastMX = xpos;
+        lastMY = ypos;
+        yaw   += dx;
+        pitch += dy;
+        pitch = glm::clamp(pitch, -89.0f, 89.0f);
+    }
+
     void update(float dt, World& world);
     void processInput(GLFWwindow* win, float dt);
     void breakBlock(World& world);

@@ -2,6 +2,7 @@
 #include "../core/Block.h"
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -40,6 +41,7 @@ uniform float uFogStart;
 uniform float uFogEnd;
 void main() {
     vec4 col = texture(uTexArray, vec3(vTexCoord, vTexLayer));
+    if (col.a < 0.5) discard;
     col.rgb *= vAO;
     float dist = length(vWorldPos - uCamPos);
     float fogFactor = clamp((dist - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
@@ -226,7 +228,57 @@ void Renderer::uploadChunkMesh(int cx, int cz, const ChunkMesh& mesh) {
     }
 }
 
+void Renderer::updateFrustum(const glm::mat4& view, const glm::mat4& proj) {
+    glm::mat4 vp = proj * view;
+    glm::mat4 m = glm::transpose(vp);
+    m_frustumPlanes[0][0] = m[3][0] + m[0][0];
+    m_frustumPlanes[0][1] = m[3][1] + m[0][1];
+    m_frustumPlanes[0][2] = m[3][2] + m[0][2];
+    m_frustumPlanes[0][3] = m[3][3] + m[0][3];
+    m_frustumPlanes[1][0] = m[3][0] - m[0][0];
+    m_frustumPlanes[1][1] = m[3][1] - m[0][1];
+    m_frustumPlanes[1][2] = m[3][2] - m[0][2];
+    m_frustumPlanes[1][3] = m[3][3] - m[0][3];
+    m_frustumPlanes[2][0] = m[3][0] + m[1][0];
+    m_frustumPlanes[2][1] = m[3][1] + m[1][1];
+    m_frustumPlanes[2][2] = m[3][2] + m[1][2];
+    m_frustumPlanes[2][3] = m[3][3] + m[1][3];
+    m_frustumPlanes[3][0] = m[3][0] - m[1][0];
+    m_frustumPlanes[3][1] = m[3][1] - m[1][1];
+    m_frustumPlanes[3][2] = m[3][2] - m[1][2];
+    m_frustumPlanes[3][3] = m[3][3] - m[1][3];
+    m_frustumPlanes[4][0] = m[3][0] + m[2][0];
+    m_frustumPlanes[4][1] = m[3][1] + m[2][1];
+    m_frustumPlanes[4][2] = m[3][2] + m[2][2];
+    m_frustumPlanes[4][3] = m[3][3] + m[2][3];
+    m_frustumPlanes[5][0] = m[3][0] - m[2][0];
+    m_frustumPlanes[5][1] = m[3][1] - m[2][1];
+    m_frustumPlanes[5][2] = m[3][2] - m[2][2];
+    m_frustumPlanes[5][3] = m[3][3] - m[2][3];
+    for (int i = 0; i < 6; ++i) {
+        float len = std::sqrt(m_frustumPlanes[i][0]*m_frustumPlanes[i][0]
+                            + m_frustumPlanes[i][1]*m_frustumPlanes[i][1]
+                            + m_frustumPlanes[i][2]*m_frustumPlanes[i][2]);
+        if (len > 0) for (int j = 0; j < 4; ++j) m_frustumPlanes[i][j] /= len;
+    }
+}
+
+bool Renderer::chunkInFrustum(int cx, int cz) const {
+    float cxPos = cx * 16.0f + 8.0f;
+    float czPos = cz * 16.0f + 8.0f;
+    for (int i = 0; i < 6; ++i) {
+        float d = m_frustumPlanes[i][0] * cxPos
+                + m_frustumPlanes[i][1] * 128.0f
+                + m_frustumPlanes[i][2] * czPos
+                + m_frustumPlanes[i][3];
+        if (d < -200.0f) return false;
+    }
+    return true;
+}
+
 void Renderer::renderChunks(const glm::mat4& view, const glm::mat4& proj) {
+    updateFrustum(view, proj);
+
     glUseProgram(m_worldProgram);
     m_textureAtlas.bind(0);
 
@@ -238,8 +290,9 @@ void Renderer::renderChunks(const glm::mat4& view, const glm::mat4& proj) {
     glDisable(GL_BLEND);
     for (auto& [key, cgl] : chunkMeshes) {
         int cx = (int)(key >> 32), cz = (int)(key & 0xFFFFFFFF);
+        if (!chunkInFrustum(cx, cz)) continue;
         float dx = (cx*16+8) - m_camPos.x, dz = (cz*16+8) - m_camPos.z;
-        if (dx*dx + dz*dz > (16.0f*14.0f)*(16.0f*14.0f)) continue;
+        if (dx*dx + dz*dz > m_cullRadius * m_cullRadius) continue;
         if (cgl.indexCount[0] == 0) continue;
         glBindVertexArray(cgl.vao[0]);
         glDrawElements(GL_TRIANGLES, cgl.indexCount[0], GL_UNSIGNED_INT, nullptr);
@@ -249,8 +302,9 @@ void Renderer::renderChunks(const glm::mat4& view, const glm::mat4& proj) {
     glDepthMask(GL_FALSE);
     for (auto& [key, cgl] : chunkMeshes) {
         int cx = (int)(key >> 32), cz = (int)(key & 0xFFFFFFFF);
+        if (!chunkInFrustum(cx, cz)) continue;
         float dx = (cx*16+8) - m_camPos.x, dz = (cz*16+8) - m_camPos.z;
-        if (dx*dx + dz*dz > (16.0f*14.0f)*(16.0f*14.0f)) continue;
+        if (dx*dx + dz*dz > m_cullRadius * m_cullRadius) continue;
         if (cgl.indexCount[1] == 0) continue;
         glBindVertexArray(cgl.vao[1]);
         glDrawElements(GL_TRIANGLES, cgl.indexCount[1], GL_UNSIGNED_INT, nullptr);

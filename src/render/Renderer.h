@@ -19,11 +19,16 @@ public:
     void renderBlockHighlight(const glm::ivec3& blockPos);
     void renderText(const std::string& text, float ndcX, float ndcY, float scaleH);
     void renderHotbar(int selectedSlot);
+    void setRenderDistance(int chunks) { m_cullRadius = 16.0f * (chunks + 0.5f); }
+    void updateFrustum(const glm::mat4& view, const glm::mat4& proj);
     void endFrame();
     GLFWwindow* window;
     glm::mat4 m_prevProjView = glm::mat4(1.0f);
     glm::vec3 m_camPos = glm::vec3(0.0f);
 private:
+    float m_cullRadius = 16.0f * 12.0f;
+    bool chunkInFrustum(int cx, int cz) const;
+    float m_frustumPlanes[6][4];
     GLuint m_worldProgram = 0;
     GLuint m_uiProgram = 0;
     GLuint m_lineProgram = 0;

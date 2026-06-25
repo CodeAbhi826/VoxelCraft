@@ -43,12 +43,13 @@ void Player::update(float dt, World& world) {
         }
     }
 
-    // Y axis
+    // Y axis — swept to prevent tunneling
     if (delta.y != 0) {
         int xMin = (int)floor(position.x - 0.3f);
         int xMax = (int)floor(position.x + 0.3f - 0.001f);
         int zMin = (int)floor(position.z - 0.3f);
         int zMax = (int)floor(position.z + 0.3f - 0.001f);
+
         if (delta.y > 0) {
             int edge = (int)floor(position.y + 1.8f + delta.y);
             bool hit = false;
@@ -58,13 +59,23 @@ void Player::update(float dt, World& world) {
             if (hit) { position.y = (float)(edge - 1.8f - 0.001f); velocity.y = 0; delta.y = 0; }
             else position.y += delta.y;
         } else {
-            int edge = (int)floor(position.y + delta.y);
+            float startY = position.y;
+            float endY   = position.y + delta.y;
+            int startBlock = (int)floor(startY);
+            int endBlock   = (int)floor(endY);
             bool hit = false;
-            for (int x = xMin; x <= xMax && !hit; ++x)
-                for (int z = zMin; z <= zMax && !hit; ++z)
-                    if (collides(x, edge, z)) hit = true;
-            if (hit) { position.y = (float)(edge + 0.001f); velocity.y = 0; delta.y = 0; onGround = true; }
-            else { position.y += delta.y; onGround = false; }
+            for (int by = startBlock; by >= endBlock && !hit; --by) {
+                for (int x = xMin; x <= xMax && !hit; ++x)
+                    for (int z = zMin; z <= zMax && !hit; ++z)
+                        if (collides(x, by, z)) {
+                            position.y = (float)(by + 1 + 0.001f);
+                            velocity.y = 0;
+                            onGround = true;
+                            delta.y = 0;
+                            hit = true;
+                        }
+            }
+            if (!hit) { position.y += delta.y; onGround = false; }
         }
     }
 
@@ -116,18 +127,6 @@ void Player::processInput(GLFWwindow* win, float dt) {
         if (glfwGetKey(win, GLFW_KEY_SPACE) && onGround) velocity.y = 8.0f;
     }
 
-    double mx, my;
-    glfwGetCursorPos(win, &mx, &my);
-    float dx = float(mx - lastMX) * 0.1f;
-    float dy = float(lastMY - my) * 0.1f;
-    lastMX = mx;
-    lastMY = my;
-    if (hasLastCursor) {
-        yaw += dx;
-        pitch += dy;
-        pitch = glm::clamp(pitch, -89.0f, 89.0f);
-    }
-    hasLastCursor = true;
 }
 
 void Player::breakBlock(World& world) {
